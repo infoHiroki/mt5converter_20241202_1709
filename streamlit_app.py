@@ -6,7 +6,7 @@ import chardet
 import lxml
 
 st.set_page_config(
-    page_title="AI-Trad",
+    page_title="MT5 Data Converter",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -75,7 +75,7 @@ def convert_html_to_df(html_content):
     
     return None
 
-st.title("AI-Trad データ変換ツール")
+st.title("MT5 Data Converter")
 
 # メインエリア
 uploaded_file = st.file_uploader(
@@ -145,11 +145,11 @@ else:
 
 # フッター
 st.markdown("---")
-st.caption("AI-Trad Data Converter")
+st.caption("MT5 Data Converter")
 
 # バージョン情報
 st.sidebar.markdown("### バージョン情報")
 st.sidebar.text("v1.0.0")
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 開発者情報")
-st.sidebar.markdown("AI-Trad Team")
+st.sidebar.markdown("MT5 Data Converter Team")
