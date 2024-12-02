@@ -1,15 +1,41 @@
 import streamlit as st
 import pandas as pd
-from bs4 import BeautifulSoup
-import io
 import chardet
-import lxml
+import io
+from pathlib import Path
 
+# ページ設定
 st.set_page_config(
     page_title="MT5 Data Converter",
-    layout="wide",
-    initial_sidebar_state="collapsed"
+    page_icon="📊",
+    layout="wide"
 )
+
+# スタイル定義
+st.markdown("""
+<style>
+    .drop-zone {
+        background: rgba(45, 55, 72, 0.1);
+        border: 2px dashed rgba(100, 116, 139, 0.2);
+        padding: 2rem;
+        border-radius: 0.5rem;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    .metric-card {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    .success-box {
+        padding: 1rem;
+        border-radius: 0.5rem;
+        background-color: rgba(72, 187, 120, 0.1);
+        border: 1px solid rgba(72, 187, 120, 0.2);
+    }
+</style>
+""", unsafe_allow_html=True)
 
 def detect_encoding(file_content):
     """ファイルのエンコーディングを検出"""
@@ -17,139 +43,133 @@ def detect_encoding(file_content):
     return result['encoding']
 
 def convert_html_to_df(html_content):
-    """HTMLテーブルをDataFrameに変換"""
+    """HTMLをDataFrameに変換"""
     try:
-        # 全てのテーブルを読み込む（より寛容なパーサーを使用）
-        dfs = pd.read_html(html_content, flavor='lxml', encoding='utf-8', 
-                          thousands=',', decimal='.',
-                          displayed_only=False)
-        
+        dfs = pd.read_html(html_content)
         if dfs:
-            # 全てのDataFrameを結合
-            df = pd.concat(dfs, ignore_index=True)
-            # 重複行を削除
-            df = df.drop_duplicates()
-            # 空の行を削除
-            df = df.dropna(how='all')
-            st.info(f"読み込んだデータ: {len(df)}行")
-            return df
+            df = pd.concat(dfs)
+            return df.dropna(how='all').drop_duplicates()
     except Exception as e:
-        st.error(f"テーブル解析エラー: {str(e)}")
-        
-    # BeautifulSoupを使用したバックアップ方法
-    try:
-        soup = BeautifulSoup(html_content, 'lxml')
-        tables = []
-        
-        # 全てのテーブル要素を検索
-        for table in soup.find_all(['table', 'tbody']):
-            rows = []
-            for tr in table.find_all('tr'):
-                row = []
-                for td in tr.find_all(['td', 'th']):
-                    # セル内のテキストを取得（改行や空白を整理）
-                    cell_text = ' '.join(td.get_text(strip=True, separator=' ').split())
-                    row.append(cell_text)
-                if row:  # 空でない行のみ追加
-                    rows.append(row)
-            
-            if rows:
-                # 最初の行をヘッダーとして使用
-                headers = rows[0]
-                # データフレームを作成
-                df = pd.DataFrame(rows[1:], columns=headers)
-                tables.append(df)
-        
-        if tables:
-            # 全てのテーブルを結合
-            final_df = pd.concat(tables, ignore_index=True)
-            # 重複行を削除
-            final_df = final_df.drop_duplicates()
-            # 空の行を削除
-            final_df = final_df.dropna(how='all')
-            st.info(f"読み込んだデータ: {len(final_df)}行")
-            return final_df
-            
-    except Exception as e:
-        st.error(f"バックアップ解析エラー: {str(e)}")
-    
+        st.error(f"変換エラー: {str(e)}")
     return None
 
-st.title("MT5 Data Converter")
+def show_stats(df):
+    """基本統計情報の表示"""
+    cols = st.columns(4)
+    metrics = [
+        ("📊 データ行数", len(df)),
+        ("🔄 重複行", df.duplicated().sum()),
+        ("📈 数値列数", df.select_dtypes(include=['number']).columns.size),
+        ("⚠️ 欠損値数", df.isna().sum().sum())
+    ]
+    
+    for col, (label, value) in zip(cols, metrics):
+        with col:
+            st.metric(label, f"{value:,}")
 
-# メインエリア
-uploaded_file = st.file_uploader(
-    "HTMLファイルをドロップ",
-    type=['html', 'htm'],
-    help="MT5から出力されたHTMLファイルをドラッグ&ドロップしてください"
-)
-
-if uploaded_file:
-    try:
-        # ファイルの内容を読み込み
+def main():
+    st.title("MT5 Data Converter")
+    
+    # ファイルアップロードエリア
+    st.markdown("""
+        <div class="drop-zone">
+            <h3>📊 MT5ファイルを変換</h3>
+            <p>HTMLファイルをドラッグ&ドロップまたはクリックして選択</p>
+            <small>対応形式: HTML, HTM</small>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    uploaded_file = st.file_uploader("", type=['html', 'htm'])
+    
+    if uploaded_file:
         content = uploaded_file.read()
-        # エンコーディングを検出
         encoding = detect_encoding(content)
-        st.info(f"検出されたエンコーディング: {encoding}")
-        # デコード
+        st.info(f"📝 検出されたエンコーディング: {encoding}")
+        
         html_content = content.decode(encoding)
         df = convert_html_to_df(html_content)
         
         if df is not None:
-            # データ分割の選択
-            col1, col2 = st.columns(2)
+            # データ統計
+            show_stats(df)
             
+            # オプション設定（上部に集約）
+            col1, col2, col3 = st.columns(3)
             with col1:
-                st.subheader("元データ")
-                st.dataframe(df, height=300)
-            
+                view_mode = st.radio("表示範囲", ["全データ", "上半分", "下半分"])
             with col2:
-                st.subheader("処理オプション")
-                process_option = st.radio(
-                    "データ処理方法",
-                    ["自動（下半分を抽出）", "手動で行を選択"]
-                )
-                
-                half_index = len(df) // 2
-                if process_option == "自動（下半分を抽出）":
-                    processed_df = df[half_index:].reset_index(drop=True)
-                else:
-                    start_row = st.number_input("開始行", 0, len(df)-1, half_index)
-                    end_row = st.number_input("終了行", start_row, len(df), len(df))
-                    processed_df = df[start_row:end_row].reset_index(drop=True)
+                process_method = st.radio("処理方法", ["自動（下半分を抽出）", "手動で範囲選択"])
+            with col3:
+                remove_duplicates = st.checkbox('重複行を除去', True)
+                remove_empty = st.checkbox('空行を除去', True)
             
-            # 処理結果の表示
-            st.subheader("処理結果")
-            st.dataframe(processed_df, height=300)
+            # データプレビュー（フル幅）
+            st.subheader("データプレビュー")
+            
+            if view_mode == "上半分":
+                preview_df = df.iloc[:len(df)//2]
+            elif view_mode == "下半分":
+                preview_df = df.iloc[len(df)//2:]
+            else:
+                preview_df = df
+            
+            st.dataframe(preview_df, height=400, use_container_width=True)
+            
+            # データ処理
+            if process_method == "自動（下半分を抽出）":
+                processed_df = df[len(df)//2:].reset_index(drop=True)
+            else:
+                range_select = st.slider(
+                    "データ範囲",
+                    0, len(df), (len(df)//2, len(df))
+                )
+                processed_df = df[range_select[0]:range_select[1]].reset_index(drop=True)
+            
+            # データクリーニング
+            if remove_duplicates:
+                processed_df = processed_df.drop_duplicates()
+            if remove_empty:
+                processed_df = processed_df.dropna(how='all')
             
             # 出力オプション
-            col3, col4 = st.columns(2)
-            with col3:
-                # CSVダウンロードボタン
-                csv = processed_df.to_csv(index=False).encode('utf-8-sig')
-                st.download_button(
-                    "📥 CSVをダウンロード",
-                    csv,
-                    f"converted_{uploaded_file.name.replace('.html', '')}.csv",
-                    "text/csv",
-                    help="変換したデータをCSVとしてダウンロード"
-                )
-            
+            col4, col5 = st.columns([1, 2])
             with col4:
-                st.info(f"出力データ: {len(processed_df)}行")
+                output_format = st.selectbox(
+                    "出力形式",
+                    ["CSV (UTF-8)", "CSV (Shift-JIS)", "Excel"]
+                )
                 
-    except Exception as e:
-        st.error(f"エラーが発生しました: {str(e)}")
-else:
-    st.info("👆 HTMLファイルをドロップしてください")
+                if output_format.startswith("CSV"):
+                    encoding = 'utf-8-sig' if "UTF-8" in output_format else 'shift-jis'
+                    csv = processed_df.to_csv(index=False).encode(encoding)
+                    st.download_button(
+                        "💾 変換データをダウンロード",
+                        csv,
+                        f"converted_{Path(uploaded_file.name).stem}.csv",
+                        "text/csv"
+                    )
+                else:
+                    buffer = io.BytesIO()
+                    with pd.ExcelWriter(buffer) as writer:
+                        processed_df.to_excel(writer, index=False)
+                    st.download_button(
+                        "💾 変換データをダウンロード",
+                        buffer,
+                        f"converted_{Path(uploaded_file.name).stem}.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+            
+            with col5:
+                st.markdown(f"""
+                    <div class="success-box">
+                        ✅ 処理完了<br>
+                        📊 出力データ: {len(processed_df):,}行
+                    </div>
+                """, unsafe_allow_html=True)
+    
+    # フッター
+    st.markdown("---")
+    st.caption("MT5 Data Converter v1.0.0")
 
-# フッター
-st.markdown("---")
-st.caption("MT5 Data Converter")
-
-# バージョン情報
-st.sidebar.markdown("### バージョン情報")
-st.sidebar.text("v1.0.0")
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 開発者情報")
-st.sidebar.markdown("MT5 Data Converter Team")
+if __name__ == "__main__":
+    main()
