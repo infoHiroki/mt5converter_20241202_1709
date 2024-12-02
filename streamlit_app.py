@@ -18,14 +18,39 @@ def detect_encoding(file_content):
 def convert_html_to_df(html_content):
     """HTMLテーブルをDataFrameに変換"""
     soup = BeautifulSoup(html_content, 'html.parser')
-    # StringIOを使用して警告を回避
-    html_io = io.StringIO(str(soup))
-    tables = pd.read_html(html_io)
+    
+    # テーブル要素を直接取得
+    tables = []
+    for table in soup.find_all('table'):
+        # テーブルの行を取得
+        rows = []
+        headers = []
+        
+        # ヘッダー行の処理
+        header_row = table.find('tr')
+        if header_row:
+            headers = [th.get_text(strip=True) for th in header_row.find_all(['th', 'td'])]
+        
+        # データ行の処理
+        for row in table.find_all('tr')[1:]:  # ヘッダー行をスキップ
+            cols = row.find_all(['td', 'th'])
+            if cols:
+                row_data = [col.get_text(strip=True) for col in cols]
+                rows.append(row_data)
+        
+        # DataFrameに変換
+        if rows:
+            if not headers:
+                # ヘッダーがない場合は列番号を使用
+                headers = [f'Column_{i+1}' for i in range(len(rows[0]))]
+            df = pd.DataFrame(rows, columns=headers)
+            tables.append(df)
+    
     if tables:
-        df = tables[0]
-        # 行数を表示（デバッグ用）
-        st.info(f"読み込んだデータ: {len(df)}行")
-        return df
+        # 全てのテーブルを結合
+        final_df = pd.concat(tables, ignore_index=True)
+        st.info(f"読み込んだデータ: {len(final_df)}行")
+        return final_df
     return None
 
 st.title("AI-Trad データ変換ツール")
