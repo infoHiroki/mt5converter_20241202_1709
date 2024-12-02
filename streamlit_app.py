@@ -3,6 +3,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 import io
 import chardet
+import lxml
 
 st.set_page_config(
     page_title="AI-Trad",
@@ -17,40 +18,61 @@ def detect_encoding(file_content):
 
 def convert_html_to_df(html_content):
     """HTMLテーブルをDataFrameに変換"""
-    soup = BeautifulSoup(html_content, 'html.parser')
+    try:
+        # 全てのテーブルを読み込む（より寛容なパーサーを使用）
+        dfs = pd.read_html(html_content, flavor='lxml', encoding='utf-8', 
+                          thousands=',', decimal='.',
+                          displayed_only=False)
+        
+        if dfs:
+            # 全てのDataFrameを結合
+            df = pd.concat(dfs, ignore_index=True)
+            # 重複行を削除
+            df = df.drop_duplicates()
+            # 空の行を削除
+            df = df.dropna(how='all')
+            st.info(f"読み込んだデータ: {len(df)}行")
+            return df
+    except Exception as e:
+        st.error(f"テーブル解析エラー: {str(e)}")
+        
+    # BeautifulSoupを使用したバックアップ方法
+    try:
+        soup = BeautifulSoup(html_content, 'lxml')
+        tables = []
+        
+        # 全てのテーブル要素を検索
+        for table in soup.find_all(['table', 'tbody']):
+            rows = []
+            for tr in table.find_all('tr'):
+                row = []
+                for td in tr.find_all(['td', 'th']):
+                    # セル内のテキストを取得（改行や空白を整理）
+                    cell_text = ' '.join(td.get_text(strip=True, separator=' ').split())
+                    row.append(cell_text)
+                if row:  # 空でない行のみ追加
+                    rows.append(row)
+            
+            if rows:
+                # 最初の行をヘッダーとして使用
+                headers = rows[0]
+                # データフレームを作成
+                df = pd.DataFrame(rows[1:], columns=headers)
+                tables.append(df)
+        
+        if tables:
+            # 全てのテーブルを結合
+            final_df = pd.concat(tables, ignore_index=True)
+            # 重複行を削除
+            final_df = final_df.drop_duplicates()
+            # 空の行を削除
+            final_df = final_df.dropna(how='all')
+            st.info(f"読み込んだデータ: {len(final_df)}行")
+            return final_df
+            
+    except Exception as e:
+        st.error(f"バックアップ解析エラー: {str(e)}")
     
-    # テーブル要素を直接取得
-    tables = []
-    for table in soup.find_all('table'):
-        # テーブルの行を取得
-        rows = []
-        headers = []
-        
-        # ヘッダー行の処理
-        header_row = table.find('tr')
-        if header_row:
-            headers = [th.get_text(strip=True) for th in header_row.find_all(['th', 'td'])]
-        
-        # データ行の処理
-        for row in table.find_all('tr')[1:]:  # ヘッダー行をスキップ
-            cols = row.find_all(['td', 'th'])
-            if cols:
-                row_data = [col.get_text(strip=True) for col in cols]
-                rows.append(row_data)
-        
-        # DataFrameに変換
-        if rows:
-            if not headers:
-                # ヘッダーがない場合は列番号を使用
-                headers = [f'Column_{i+1}' for i in range(len(rows[0]))]
-            df = pd.DataFrame(rows, columns=headers)
-            tables.append(df)
-    
-    if tables:
-        # 全てのテーブルを結合
-        final_df = pd.concat(tables, ignore_index=True)
-        st.info(f"読み込んだデータ: {len(final_df)}行")
-        return final_df
     return None
 
 st.title("AI-Trad データ変換ツール")
