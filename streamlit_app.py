@@ -92,7 +92,7 @@ def show_stats(df):
 
 def main():
     st.title("MT5 Data Converter")
-
+    
     # タブの作成
     tab1, tab2 = st.tabs(["HTML変換", "CSV変換（15分足）"])
     
@@ -146,20 +146,24 @@ def main():
                 if output_format.startswith("CSV"):
                     encoding = 'utf-8-sig' if "UTF-8" in output_format else 'shift-jis'
                     csv = output_df.to_csv(index=False).encode(encoding)
+                    # 元のファイル名から.htmlまたは.htmを.csvに置換
+                    output_filename = Path(uploaded_file.name).stem + '.csv'
                     st.download_button(
                         "💾 CSVをダウンロード",
                         csv,
-                        f"converted_{Path(uploaded_file.name).stem}.csv",
+                        output_filename,
                         "text/csv"
                     )
                 else:
                     buffer = io.BytesIO()
                     with pd.ExcelWriter(buffer) as writer:
                         output_df.to_excel(writer, index=False)
+                    # 元のファイル名から.htmlまたは.htmを.xlsxに置換
+                    output_filename = Path(uploaded_file.name).stem + '.xlsx'
                     st.download_button(
                         "💾 Excelをダウンロード",
                         buffer,
-                        f"converted_{Path(uploaded_file.name).stem}.xlsx",
+                        output_filename,
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
 
