@@ -44,24 +44,31 @@ def get_column_names(num_columns):
     extra_columns = [f'列{i+1}' for i in range(len(base_columns), num_columns)]
     return base_columns + extra_columns
 
+def find_trade_data_start(df):
+    """約定データの開始行を検索"""
+    for idx, row in df.iterrows():
+        # 列名に"約定"が含まれている行を探す
+        if any('約定' in str(val) for val in row):
+            return idx + 1
+    return 0
+
 def convert_html_to_df(html_content):
-    """HTMLから1393行目以降のデータを抽出"""
+    """HTMLから約定データを抽出"""
     try:
         dfs = pd.read_html(html_content)
         if dfs:
             # 最も行数の多いテーブルを選択
             main_df = max(dfs, key=len)
             
-            # 列名が数字のみの場合、適切な列名を設定
-            if all(str(col).isdigit() for col in main_df.columns):
-                # 列数に応じて動的に列名を設定
+            # 約定データの開始行を検索
+            start_idx = find_trade_data_start(main_df)
+            if start_idx > 0:
+                # 約定データ以降を抽出
+                main_df = main_df.iloc[start_idx:]
+                
+                # 列名を設定
                 column_names = get_column_names(len(main_df.columns))
                 main_df.columns = column_names
-                st.info(f"検出された列数: {len(main_df.columns)}")
-            
-            # 1393行目以降のデータを抽出
-            if len(main_df) >= 1393:
-                main_df = main_df.iloc[1392:]  # 1393行目から（0-basedなので1392から）
                 
                 # 'end of test'までのデータを抽出
                 if 'end of test' in main_df.values:
@@ -71,6 +78,7 @@ def convert_html_to_df(html_content):
                 # 'balance'行の除去
                 main_df = main_df[~main_df.apply(lambda x: x.astype(str).str.contains('balance', case=False)).any(axis=1)]
                 
+                st.info(f"検出された列数: {len(main_df.columns)}")
                 return main_df
             
     except Exception as e:
@@ -149,7 +157,7 @@ def main():
                 st.download_button(
                     "💾 CSVをダウンロード",
                     csv,
-                    f"converted_{Path(uploaded_file.name).stem}_1393plus.csv",
+                    f"converted_{Path(uploaded_file.name).stem}.csv",
                     "text/csv"
                 )
             else:
@@ -159,7 +167,7 @@ def main():
                 st.download_button(
                     "💾 Excelをダウンロード",
                     buffer,
-                    f"converted_{Path(uploaded_file.name).stem}_1393plus.xlsx",
+                    f"converted_{Path(uploaded_file.name).stem}.xlsx",
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
     
