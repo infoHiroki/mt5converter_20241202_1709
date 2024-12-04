@@ -1,4 +1,4 @@
-# AI-Trad データ変換ツール
+# MT5バックテストデータ変換ツール
 
 MT5から出力されたHTMLファイルのデータを抽出し、CSVファイルに変換するWebアプリケーションです。
 
@@ -67,19 +67,6 @@ http://localhost:8501
 
 4. 「Deploy」をクリック
 
-## プロジェクト構造
-
-```
-ai_trad/
-├── .streamlit/          # Streamlit設定
-│   └── config.toml     # アプリケーション設定
-├── src/
-│   └── app.py          # メインアプリケーション
-├── .gitignore          # Git除外設定
-├── requirements.txt    # パッケージ依存関係
-└── README.md          # プロジェクト説明
-```
-
 ## 技術スタック
 
 - Python 3.8+
@@ -94,4 +81,4 @@ MIT License
 
 ## 開発者
 
-AI-Trad Team
+MT5Converter Team
