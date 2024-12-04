@@ -49,7 +49,11 @@ def find_trade_data_start(df):
     for idx, row in df.iterrows():
         # 列名に"約定"が含まれている行を探す
         if any('約定' in str(val) for val in row):
-            return idx + 1
+            # その行の内容を確認
+            row_values = [str(val).strip() for val in row if pd.notna(val)]
+            # "約定"という単独の値が含まれているかチェック
+            if '約定' in row_values:
+                return idx + 1
     return 0
 
 def convert_html_to_df(html_content):
@@ -70,10 +74,13 @@ def convert_html_to_df(html_content):
                 column_names = get_column_names(len(main_df.columns))
                 main_df.columns = column_names
                 
-                # 'end of test'までのデータを抽出
+                # 'end of test'を含む行までのデータを抽出（その行も含める）
                 if 'end of test' in main_df.values:
                     end_idx = main_df.apply(lambda x: x.astype(str).str.contains('end of test')).any(axis=1).idxmax()
-                    main_df = main_df.iloc[:end_idx]
+                    main_df = main_df.iloc[:end_idx + 1]  # +1 で end of test の行も含める
+                    
+                    # end of test以降のデータを完全に除外
+                    main_df = main_df.head(end_idx + 1)
                 
                 # 'balance'行の除去
                 main_df = main_df[~main_df.apply(lambda x: x.astype(str).str.contains('balance', case=False)).any(axis=1)]
