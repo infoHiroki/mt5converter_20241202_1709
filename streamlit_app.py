@@ -59,7 +59,10 @@ def find_trade_data_start(df):
 def convert_html_to_df(html_content):
     """HTMLから約定データを抽出"""
     try:
-        dfs = pd.read_html(html_content)
+        # StringIOオブジェクトを使用してHTMLを読み込む
+        html_io = io.StringIO(html_content)
+        dfs = pd.read_html(html_io)
+        
         if dfs:
             # 最も行数の多いテーブルを選択
             main_df = max(dfs, key=len)
@@ -118,7 +121,8 @@ def main():
         </div>
     """, unsafe_allow_html=True)
     
-    uploaded_file = st.file_uploader("", type=['html', 'htm'])
+    # ファイルアップローダーにラベルを追加
+    uploaded_file = st.file_uploader("HTMLファイルを選択", type=['html', 'htm'], label_visibility="collapsed")
     
     if uploaded_file:
         content = uploaded_file.read()
