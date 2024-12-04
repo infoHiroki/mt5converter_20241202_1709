@@ -30,22 +30,9 @@ def detect_encoding(file_content):
     result = chardet.detect(file_content)
     return result['encoding']
 
-def get_column_names(num_columns):
-    """列数に応じて列名を生成"""
-    # 基本の列名リスト
-    base_columns = ['時間', '約定', '銘柄', 'タイプ', '新規・決済', '数量', '価格', '注文', 
-                   '手数料', 'スワップ', '損益', '残高', 'コメント']
-    
-    # 列数が基本リストより少ない場合は、必要な分だけ使用
-    if num_columns <= len(base_columns):
-        return base_columns[:num_columns]
-    
-    # 列数が基本リストより多い場合は、追加の列名を生成
-    extra_columns = [f'列{i+1}' for i in range(len(base_columns), num_columns)]
-    return base_columns + extra_columns
-
 def find_trade_data_start(df):
     """約定データの開始行を検索"""
+    # 各行をチェック
     for idx, row in df.iterrows():
         # 列名に"約定"が含まれている行を探す
         if any('約定' in str(val) for val in row):
@@ -73,22 +60,14 @@ def convert_html_to_df(html_content):
                 # 約定データ以降を抽出
                 main_df = main_df.iloc[start_idx:]
                 
-                # 列名を設定
-                column_names = get_column_names(len(main_df.columns))
-                main_df.columns = column_names
-                
                 # 'end of test'を含む行までのデータを抽出（その行も含める）
                 if 'end of test' in main_df.values:
                     end_idx = main_df.apply(lambda x: x.astype(str).str.contains('end of test')).any(axis=1).idxmax()
                     main_df = main_df.iloc[:end_idx + 1]  # +1 で end of test の行も含める
-                    
-                    # end of test以降のデータを完全に除外
-                    main_df = main_df.head(end_idx + 1)
                 
                 # 'balance'行の除去
                 main_df = main_df[~main_df.apply(lambda x: x.astype(str).str.contains('balance', case=False)).any(axis=1)]
                 
-                st.info(f"検出された列数: {len(main_df.columns)}")
                 return main_df
             
     except Exception as e:
@@ -133,10 +112,6 @@ def main():
         df = convert_html_to_df(html_content)
         
         if df is not None:
-            # 列名の表示
-            st.subheader("検出された列")
-            st.write(", ".join(df.columns.tolist()))
-            
             # データ統計
             show_stats(df)
             
