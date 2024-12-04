@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import chardet
 import io
+import os
 from pathlib import Path
+from src.data_processor import process_csv
 
 # ページ設定
 st.set_page_config(
@@ -90,72 +92,114 @@ def show_stats(df):
 
 def main():
     st.title("MT5 Data Converter")
+
+    # タブの作成
+    tab1, tab2 = st.tabs(["HTML変換", "CSV変換（15分足）"])
     
-    # ファイルアップロードエリア
-    st.markdown("""
-        <div class="drop-zone">
-            <h3>📊 MT5ファイルを変換</h3>
-            <p>HTMLファイルをドラッグ&ドロップまたはクリックして選択</p>
-            <small>対応形式: HTML, HTM</small>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    # ファイルアップローダーにラベルを追加
-    uploaded_file = st.file_uploader("HTMLファイルを選択", type=['html', 'htm'], label_visibility="collapsed")
-    
-    if uploaded_file:
-        content = uploaded_file.read()
-        encoding = detect_encoding(content)
-        st.info(f"📝 検出されたエンコーディング: {encoding}")
+    with tab1:
+        # ファイルアップロードエリア
+        st.markdown("""
+            <div class="drop-zone">
+                <h3>📊 MT5ファイルを変換</h3>
+                <p>HTMLファイルをドラッグ&ドロップまたはクリックして選択</p>
+                <small>対応形式: HTML, HTM</small>
+            </div>
+        """, unsafe_allow_html=True)
         
-        html_content = content.decode(encoding)
-        df = convert_html_to_df(html_content)
+        # ファイルアップローダーにラベルを追加
+        uploaded_file = st.file_uploader("HTMLファイルを選択", type=['html', 'htm'], label_visibility="collapsed", key="html_uploader")
         
-        if df is not None:
-            # データ統計
-            show_stats(df)
+        if uploaded_file:
+            content = uploaded_file.read()
+            encoding = detect_encoding(content)
+            st.info(f"📝 検出されたエンコーディング: {encoding}")
             
-            # データプレビュー
-            st.subheader("データプレビュー")
-            st.dataframe(df, height=400, use_container_width=True)
+            html_content = content.decode(encoding)
+            df = convert_html_to_df(html_content)
             
-            # 出力オプション
-            st.subheader("データ出力")
-            
-            # 空行削除オプション
-            remove_empty = st.checkbox('空行を削除してダウンロード', True)
-            
-            output_format = st.selectbox(
-                "出力形式を選択",
-                ["CSV (UTF-8)", "CSV (Shift-JIS)", "Excel"]
-            )
-            
-            # データの処理
-            output_df = df.copy()
-            if remove_empty:
-                output_df = output_df.dropna(how='all')
-                st.info(f"空行削除後のデータ行数: {len(output_df)}")
-            
-            # 選択された形式でダウンロードボタンを表示
-            if output_format.startswith("CSV"):
-                encoding = 'utf-8-sig' if "UTF-8" in output_format else 'shift-jis'
-                csv = output_df.to_csv(index=False).encode(encoding)
-                st.download_button(
-                    "💾 CSVをダウンロード",
-                    csv,
-                    f"converted_{Path(uploaded_file.name).stem}.csv",
-                    "text/csv"
+            if df is not None:
+                # データ統計
+                show_stats(df)
+                
+                # データプレビュー
+                st.subheader("データプレビュー")
+                st.dataframe(df, height=400, use_container_width=True)
+                
+                # 出力オプション
+                st.subheader("データ出力")
+                
+                # 空行削除オプション
+                remove_empty = st.checkbox('空行を削除してダウンロード', True)
+                
+                output_format = st.selectbox(
+                    "出力形式を選択",
+                    ["CSV (UTF-8)", "CSV (Shift-JIS)", "Excel"]
                 )
-            else:
-                buffer = io.BytesIO()
-                with pd.ExcelWriter(buffer) as writer:
-                    output_df.to_excel(writer, index=False)
-                st.download_button(
-                    "💾 Excelをダウンロード",
-                    buffer,
-                    f"converted_{Path(uploaded_file.name).stem}.xlsx",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+                
+                # データの処理
+                output_df = df.copy()
+                if remove_empty:
+                    output_df = output_df.dropna(how='all')
+                    st.info(f"空行削除後のデータ行数: {len(output_df)}")
+                
+                # 選択された形式でダウンロードボタンを表示
+                if output_format.startswith("CSV"):
+                    encoding = 'utf-8-sig' if "UTF-8" in output_format else 'shift-jis'
+                    csv = output_df.to_csv(index=False).encode(encoding)
+                    st.download_button(
+                        "💾 CSVをダウンロード",
+                        csv,
+                        f"converted_{Path(uploaded_file.name).stem}.csv",
+                        "text/csv"
+                    )
+                else:
+                    buffer = io.BytesIO()
+                    with pd.ExcelWriter(buffer) as writer:
+                        output_df.to_excel(writer, index=False)
+                    st.download_button(
+                        "💾 Excelをダウンロード",
+                        buffer,
+                        f"converted_{Path(uploaded_file.name).stem}.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+
+    with tab2:
+        # CSV変換機能（15分足）
+        st.markdown("""
+            <div class="drop-zone">
+                <h3>📊 15分足データに変換</h3>
+                <p>CSVファイルをドラッグ&ドロップまたはクリックして選択</p>
+                <small>対応形式: CSV</small>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        csv_file = st.file_uploader("CSVファイルを選択", type=['csv'], key="csv_uploader")
+        
+        if csv_file:
+            # 一時ファイルとして保存
+            input_path = f"data/input/{csv_file.name}"
+            os.makedirs('data/input', exist_ok=True)
+            
+            with open(input_path, 'wb') as f:
+                f.write(csv_file.getbuffer())
+            
+            if st.button('15分足データに変換'):
+                with st.spinner('データを変換中...'):
+                    # データ処理の実行
+                    output_path = process_csv(input_path)
+                    
+                    if output_path and os.path.exists(output_path):
+                        # 変換結果のダウンロードボタンを表示
+                        with open(output_path, 'rb') as f:
+                            st.download_button(
+                                label="💾 変換済みファイルをダウンロード",
+                                data=f,
+                                file_name=os.path.basename(output_path),
+                                mime='text/csv'
+                            )
+                        st.success('変換が完了しました！')
+                    else:
+                        st.error('変換中にエラーが発生しました。')
     
     # フッター
     st.markdown("---")
