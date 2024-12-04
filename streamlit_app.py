@@ -47,8 +47,31 @@ def convert_html_to_df(html_content):
     try:
         dfs = pd.read_html(html_content)
         if dfs:
-            df = pd.concat(dfs)
-            return df.dropna(how='all').drop_duplicates()
+            # 最も行数の多いテーブルを選択（通常、これが主要なデータテーブル）
+            main_df = max(dfs, key=len)
+            
+            # 1393行目以降のデータを抽出
+            if len(main_df) >= 1393:
+                main_df = main_df.iloc[1392:]  # 1393行目から（0-basedなので1392から）
+            
+            # 'end of test' を含む行を見つけて、そこまでのデータを抽出
+            if 'end of test' in main_df.values:
+                end_idx = main_df.apply(lambda x: x.astype(str).str.contains('end of test')).any(axis=1).idxmax()
+                main_df = main_df.iloc[:end_idx+1]
+            
+            # 列名が数字のみの場合、適切な列名を設定
+            if all(str(col).isdigit() for col in main_df.columns):
+                main_df.columns = ['時間', '約定', '銘柄', 'タイプ', '新規・決済', '数量', '価格', '注文', 
+                                 '手数料', 'スワップ', '損益', '残高', 'コメント']
+            
+            # 重複行と空行を除去
+            main_df = main_df.dropna(how='all').drop_duplicates()
+            
+            # 'balance' という文字列を含む行を除外（ヘッダー行の除去）
+            main_df = main_df[~main_df.apply(lambda x: x.astype(str).str.contains('balance', case=False)).any(axis=1)]
+            
+            return main_df
+            
     except Exception as e:
         st.error(f"変換エラー: {str(e)}")
     return None
@@ -96,9 +119,9 @@ def main():
             # オプション設定（上部に集約）
             col1, col2, col3 = st.columns(3)
             with col1:
-                view_mode = st.radio("表示範囲", ["全データ", "上半分", "下半分"])
+                view_mode = st.radio("表示範囲", ["全データ", "最新のデータ", "古いデータ"])
             with col2:
-                process_method = st.radio("処理方法", ["自動（下半分を抽出）", "手動で範囲選択"])
+                process_method = st.radio("処理方法", ["最新のデータを抽出", "手動で範囲選択"])
             with col3:
                 remove_duplicates = st.checkbox('重複行を除去', True)
                 remove_empty = st.checkbox('空行を除去', True)
@@ -106,22 +129,22 @@ def main():
             # データプレビュー（フル幅）
             st.subheader("データプレビュー")
             
-            if view_mode == "上半分":
-                preview_df = df.iloc[:len(df)//2]
-            elif view_mode == "下半分":
-                preview_df = df.iloc[len(df)//2:]
+            if view_mode == "最新のデータ":
+                preview_df = df.head(len(df)//2)
+            elif view_mode == "古いデータ":
+                preview_df = df.tail(len(df)//2)
             else:
                 preview_df = df
             
             st.dataframe(preview_df, height=400, use_container_width=True)
             
             # データ処理
-            if process_method == "自動（下半分を抽出）":
-                processed_df = df[len(df)//2:].reset_index(drop=True)
+            if process_method == "最新のデータを抽出":
+                processed_df = df.head(len(df)//2).reset_index(drop=True)
             else:
                 range_select = st.slider(
                     "データ範囲",
-                    0, len(df), (len(df)//2, len(df))
+                    0, len(df), (0, len(df)//2)
                 )
                 processed_df = df[range_select[0]:range_select[1]].reset_index(drop=True)
             
