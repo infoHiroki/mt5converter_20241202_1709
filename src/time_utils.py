@@ -15,6 +15,11 @@ def round_time_to_nearest_15min(dt: datetime.datetime) -> datetime.datetime:
     minutes = dt.minute
     
     # 15分単位で最も近い時間に丸める
+    # 52.5分以上なら次の時間の0分に丸める
+    if minutes >= 52:
+        return dt.replace(minute=0, second=0, microsecond=0) + datetime.timedelta(hours=1)
+    
+    # それ以外は15分単位で最も近い時間に丸める
     rounded_minutes = ((minutes + 7) // 15) * 15
     
     # 丸めた結果が60分になった場合は次の時間の0分とする
