@@ -5,6 +5,8 @@ import io
 import os
 from pathlib import Path
 from src.data_processor import process_csv
+from src.time_utils import round_time_to_nearest_15min
+from datetime import datetime
 
 # ページ設定
 st.set_page_config(
@@ -12,6 +14,9 @@ st.set_page_config(
     page_icon="📊",
     layout="wide"
 )
+
+# MT5データのカラム名定義
+MT5_COLUMNS = ['時間', '約定', '銘柄', 'タイプ', '新規・決済', '数量', '価格', '注文', '手数料', 'スワップ', '損益', '残高', 'コメント']
 
 # スタイル定義
 st.markdown("""
@@ -32,17 +37,14 @@ def detect_encoding(file_content):
     result = chardet.detect(file_content)
     return result['encoding']
 
-def find_trade_data_start(df):
-    """約定データの開始行を検索"""
-    # 各行をチェック
-    for idx, row in df.iterrows():
-        # 列名に"約定"が含まれている行を探す
-        if any('約定' in str(val) for val in row):
-            # その行の内容を確認
-            row_values = [str(val).strip() for val in row if pd.notna(val)]
-            # "約定"という単独の値が含まれているかチェック
-            if '約定' in row_values:
-                return idx + 1
+def find_data_start(df):
+    """実データの開始行を検索"""
+    # "約定"と"時間"が連続する行を探す
+    for idx in range(len(df) - 1):
+        current_row = df.iloc[idx].astype(str)
+        next_row = df.iloc[idx + 1].astype(str)
+        if any('約定' in str(val) for val in current_row) and any('時間' in str(val) for val in next_row):
+            return idx + 2  # "時間"の行の次から実データ開始
     return 0
 
 def convert_html_to_df(html_content):
@@ -56,11 +58,14 @@ def convert_html_to_df(html_content):
             # 最も行数の多いテーブルを選択
             main_df = max(dfs, key=len)
             
-            # 約定データの開始行を検索
-            start_idx = find_trade_data_start(main_df)
+            # 実データの開始行を検索
+            start_idx = find_data_start(main_df)
             if start_idx > 0:
-                # 約定データ以降を抽出
+                # 実データ部分を抽出
                 main_df = main_df.iloc[start_idx:]
+                
+                # カラム名を設定
+                main_df.columns = MT5_COLUMNS
                 
                 # 'end of test'を含む行までのデータを抽出（その行も含める）
                 if 'end of test' in main_df.values:
@@ -89,6 +94,18 @@ def show_stats(df):
     for col, (label, value) in zip(cols, metrics):
         with col:
             st.metric(label, f"{value:,}")
+
+def round_time_column(df):
+    """時間列の丸め処理"""
+    result_df = df.copy()
+    # NaNでない値のみを処理
+    mask = pd.notna(result_df['時間'])
+    if mask.any():
+        # 有効な時間データのみを処理
+        valid_times = pd.to_datetime(result_df.loc[mask, '時間'].astype(str), format='%Y.%m.%d %H:%M:%S')
+        rounded_times = valid_times.apply(round_time_to_nearest_15min)
+        result_df.loc[mask, '時間'] = rounded_times.dt.strftime('%Y.%m.%d %H:%M:%S')
+    return result_df
 
 def main():
     st.title("MT5 Data Converter")
@@ -130,6 +147,15 @@ def main():
                 
                 # 空行削除オプション
                 remove_empty = st.checkbox('空行を削除してダウンロード', True)
+
+                # 時間丸めオプション
+                round_time = st.checkbox('時間を15分単位に丸める', False)
+                if round_time:
+                    try:
+                        df = round_time_column(df)
+                        st.success("✅ 時間を15分単位に丸めました")
+                    except Exception as e:
+                        st.error(f"時間の丸め処理でエラーが発生しました: {str(e)}")
                 
                 output_format = st.selectbox(
                     "出力形式を選択",
