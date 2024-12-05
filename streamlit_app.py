@@ -238,7 +238,7 @@ def main():
                         
                         if output_df is not None:
                             # 変換結果のダウンロードボタンを表示
-                            output_filename = Path(csv_file.name).stem + '_extracted.csv'
+                            output_filename = Path(csv_file.name).stem + '_BD.csv'
                             csv = output_df.to_csv(index=False).encode('utf-8-sig')
                             st.download_button(
                                 label="💾 抽出済みファイルをダウンロード",
