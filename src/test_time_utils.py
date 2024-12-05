@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime
-from time_utils import round_time_to_nearest_15min
+from src.time_utils import round_time_to_nearest_15min
 
 class TestTimeUtils(unittest.TestCase):
     def test_round_time_to_nearest_15min(self):
