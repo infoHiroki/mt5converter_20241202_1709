@@ -112,7 +112,7 @@ def main():
     st.title("MT5 Data Converter")
     
     # タブの作成
-    tab1, tab2 = st.tabs(["HTML変換", "CSV変換（15分足）"])
+    tab1, tab2 = st.tabs(["HTML変換", "時間・残高抽出"])
     
     with tab1:
         # ファイルアップロードエリア
@@ -195,10 +195,10 @@ def main():
                     )
 
     with tab2:
-        # CSV変換機能（15分足）
+        # 時間・残高抽出機能
         st.markdown("""
             <div class="drop-zone">
-                <h3>📊 15分足データに変換</h3>
+                <h3>📊 時間・残高データを抽出</h3>
                 <p>CSVファイルをドラッグ&ドロップまたはクリックして選択</p>
                 <small>対応形式: CSV</small>
             </div>
@@ -212,25 +212,25 @@ def main():
                 tmp_file.write(csv_file.getbuffer())
                 input_path = tmp_file.name
             
-            if st.button('15分足データに変換'):
-                with st.spinner('データを変換中...'):
+            if st.button('データを抽出'):
+                with st.spinner('データを処理中...'):
                     try:
                         # データ処理の実行
                         output_df = process_csv(input_path)
                         
                         if output_df is not None:
                             # 変換結果のダウンロードボタンを表示
-                            output_filename = Path(csv_file.name).stem + '_converted.csv'
+                            output_filename = Path(csv_file.name).stem + '_extracted.csv'
                             csv = output_df.to_csv(index=False).encode('utf-8-sig')
                             st.download_button(
-                                label="💾 変換済みファイルをダウンロード",
+                                label="💾 抽出済みファイルをダウンロード",
                                 data=csv,
                                 file_name=output_filename,
                                 mime='text/csv'
                             )
-                            st.success('変換が完了しました！')
+                            st.success('抽出が完了しました！')
                         else:
-                            st.error('変換中にエラーが発生しました。')
+                            st.error('処理中にエラーが発生しました。')
                     finally:
                         # 一時ファイルを削除
                         try:

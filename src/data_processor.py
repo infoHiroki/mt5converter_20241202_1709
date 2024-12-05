@@ -13,7 +13,6 @@ def process_csv(file_path: str) -> Optional[pd.DataFrame]:
     """
     CSVファイルを処理し、指定された変換を行う関数。
     - 指定された列を削除し、"時間"と"残高"のデータを抽出、フォーマットや補完を行う。
-    - 全ての時刻を15分刻みに丸め、データが15分間隔で揃うように整形。
     - 数値データから不要なスペースを削除する。
     
     Parameters:
@@ -55,39 +54,15 @@ def process_csv(file_path: str) -> Optional[pd.DataFrame]:
         logger.info("日時データの変換中...")
         time_balance_info['DateTime'] = pd.to_datetime(time_balance_info['DateTime'].str.replace('.', '/'), errors='coerce')
         
-        # 時刻を15分単位に丸める（最近傍の15分に調整）
-        time_balance_info['DateTime'] = time_balance_info['DateTime'].dt.round('15min')
-        
         # 重複行とDateTimeの値が欠けている行を削除
         time_balance_info = time_balance_info.drop_duplicates(subset=['DateTime'])
         time_balance_info = time_balance_info.dropna(subset=['DateTime'])
         logger.info("データのクリーニング完了")
         
-        # 15分間隔の完全な日付範囲を作成
-        full_date_range = pd.date_range(start=time_balance_info['DateTime'].min(), 
-                                      end=time_balance_info['DateTime'].max(), 
-                                      freq='15T')
-        missing_dates = full_date_range.difference(time_balance_info['DateTime'])
-        logger.info(f"欠損している時間帯の数: {len(missing_dates)}")
+        # 日時を元のフォーマットに戻す
+        time_balance_info['DateTime'] = time_balance_info['DateTime'].dt.strftime('%Y.%m.%d %H:%M:%S')
         
-        # 欠損日付を含むデータフレームを作成
-        missing_data = pd.DataFrame({
-            'DateTime': missing_dates,
-            'Balance': None
-        })
-        
-        # データの結合と昇順ソート
-        data_combined = pd.concat([time_balance_info, missing_data], ignore_index=True)
-        data_combined = data_combined.sort_values(by='DateTime').reset_index(drop=True)
-        
-        # 残高を前回のデータで補完
-        data_combined['Balance'] = data_combined['Balance'].ffill()
-        
-        # 重複行の最終的な削除
-        data_combined = data_combined.drop_duplicates(subset=['DateTime'], keep='first')
-        logger.info("データの補完と整形完了")
-        
-        return data_combined
+        return time_balance_info
 
     except Exception as e:
         logger.error(f"エラーが発生しました: {str(e)}", exc_info=True)
