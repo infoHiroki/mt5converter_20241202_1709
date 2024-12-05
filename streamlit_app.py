@@ -102,10 +102,28 @@ def round_time_column(df):
     # NaNでない値のみを処理
     mask = pd.notna(result_df['時間'])
     if mask.any():
-        # 有効な時間データのみを処理
-        valid_times = pd.to_datetime(result_df.loc[mask, '時間'].astype(str), format='%Y.%m.%d %H:%M:%S')
+        try:
+            # まず YYYY.MM.DD HH:MM:SS 形式で変換を試みる
+            valid_times = pd.to_datetime(result_df.loc[mask, '時間'].astype(str), format='%Y.%m.%d %H:%M:%S')
+        except ValueError:
+            try:
+                # 次に YYYY-MM-DD HH:MM:SS 形式で変換を試みる
+                valid_times = pd.to_datetime(result_df.loc[mask, '時間'].astype(str), format='%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                # どちらの形式でもない場合は一般的な形式で解析を試みる
+                valid_times = pd.to_datetime(result_df.loc[mask, '時間'].astype(str))
+        
+        # 時間を15分単位に丸める
         rounded_times = valid_times.apply(round_time_to_nearest_15min)
-        result_df.loc[mask, '時間'] = rounded_times.dt.strftime('%Y.%m.%d %H:%M:%S')
+        
+        # 元の形式を判定して適切な形式で戻す
+        if '.' in str(result_df.loc[mask, '時間'].iloc[0]):
+            # YYYY.MM.DD HH:MM:SS 形式
+            result_df.loc[mask, '時間'] = rounded_times.dt.strftime('%Y.%m.%d %H:%M:%S')
+        else:
+            # YYYY-MM-DD HH:MM:SS 形式
+            result_df.loc[mask, '時間'] = rounded_times.dt.strftime('%Y-%m-%d %H:%M:%S')
+    
     return result_df
 
 def main():
