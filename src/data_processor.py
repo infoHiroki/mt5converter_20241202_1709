@@ -9,9 +9,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def process_csv(file_path: str) -> Optional[str]:
+def process_csv(file_path: str) -> Optional[pd.DataFrame]:
     """
-    CSVファイルを処理し、指定された変換を行って新しいCSVファイルに保存する関数。
+    CSVファイルを処理し、指定された変換を行う関数。
     - 指定された列を削除し、"時間"と"残高"のデータを抽出、フォーマットや補完を行う。
     - 全ての時刻を15分刻みに丸め、データが15分間隔で揃うように整形。
     - 数値データから不要なスペースを削除する。
@@ -20,7 +20,7 @@ def process_csv(file_path: str) -> Optional[str]:
     - file_path (str): CSVファイルのパス
     
     Returns:
-    - Optional[str]: 保存された新しいCSVファイルのパス、エラー時はNone
+    - Optional[pd.DataFrame]: 処理済みのデータフレーム、エラー時はNone
     """
     try:
         # CSVファイルを読み込む
@@ -87,12 +87,7 @@ def process_csv(file_path: str) -> Optional[str]:
         data_combined = data_combined.drop_duplicates(subset=['DateTime'], keep='first')
         logger.info("データの補完と整形完了")
         
-        # 出力ファイル名を入力ファイル名に基づいて「_BD」を追加して保存
-        final_output_csv_path = file_path.replace('.csv', '_BD.csv')
-        data_combined.to_csv(final_output_csv_path, index=False, encoding='utf-8-sig')
-        logger.info(f"ファイル保存完了: {final_output_csv_path}")
-        
-        return final_output_csv_path
+        return data_combined
 
     except Exception as e:
         logger.error(f"エラーが発生しました: {str(e)}", exc_info=True)
@@ -102,8 +97,9 @@ if __name__ == "__main__":
     import sys
     if len(sys.argv) > 1:
         result = process_csv(sys.argv[1])
-        if result:
-            print(f"処理が完了しました。出力ファイル: {result}")
+        if result is not None:
+            print("処理が完了しました。")
+            print(result.head())
         else:
             print("処理に失敗しました。")
     else:

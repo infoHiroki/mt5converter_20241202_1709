@@ -3,6 +3,7 @@ import pandas as pd
 import chardet
 import io
 import os
+import tempfile
 from pathlib import Path
 from src.data_processor import process_csv
 from src.time_utils import round_time_to_nearest_15min
@@ -207,29 +208,35 @@ def main():
         
         if csv_file:
             # 一時ファイルとして保存
-            input_path = f"data/input/{csv_file.name}"
-            os.makedirs('data/input', exist_ok=True)
-            
-            with open(input_path, 'wb') as f:
-                f.write(csv_file.getbuffer())
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmp_file:
+                tmp_file.write(csv_file.getbuffer())
+                input_path = tmp_file.name
             
             if st.button('15分足データに変換'):
                 with st.spinner('データを変換中...'):
-                    # データ処理の実行
-                    output_path = process_csv(input_path)
-                    
-                    if output_path and os.path.exists(output_path):
-                        # 変換結果のダウンロードボタンを表示
-                        with open(output_path, 'rb') as f:
+                    try:
+                        # データ処理の実行
+                        output_df = process_csv(input_path)
+                        
+                        if output_df is not None:
+                            # 変換結果のダウンロードボタンを表示
+                            output_filename = Path(csv_file.name).stem + '_converted.csv'
+                            csv = output_df.to_csv(index=False).encode('utf-8-sig')
                             st.download_button(
                                 label="💾 変換済みファイルをダウンロード",
-                                data=f,
-                                file_name=os.path.basename(output_path),
+                                data=csv,
+                                file_name=output_filename,
                                 mime='text/csv'
                             )
-                        st.success('変換が完了しました！')
-                    else:
-                        st.error('変換中にエラーが発生しました。')
+                            st.success('変換が完了しました！')
+                        else:
+                            st.error('変換中にエラーが発生しました。')
+                    finally:
+                        # 一時ファイルを削除
+                        try:
+                            os.unlink(input_path)
+                        except:
+                            pass
     
     # フッター
     st.markdown("---")
