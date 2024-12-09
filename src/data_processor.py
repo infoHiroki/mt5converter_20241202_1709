@@ -91,39 +91,52 @@ def process_csv(file_path: str) -> Optional[pd.DataFrame]:
         # DateTime列を日時型に変換
         df['DateTime'] = pd.to_datetime(df['DateTime'], format='%Y.%m.%d %H:%M:%S')
         
+        # 重複行とDateTimeの欠損値を削除
+        df = df.drop_duplicates(subset=['DateTime'])
+        df = df.dropna(subset=['DateTime'])
+        logger.info(f"重複・欠損値除去後のデータ行数: {len(df)}行")
+        
         # データを時間順にソート
         df = df.sort_values('DateTime')
         
-        # 最初と最後の時間を取得
-        start_time = df['DateTime'].min()
-        end_time = df['DateTime'].max()
-        
-        # 15分間隔の時間範囲を生成
-        time_range = pd.date_range(
-            start=start_time,
-            end=end_time,
-            freq='15min'
+        # 15分間隔の完全な日付範囲を作成
+        full_date_range = pd.date_range(
+            start=df['DateTime'].min(),
+            end=df['DateTime'].max(),
+            freq='15T'
         )
         
-        # 新しいデータフレームを作成
-        new_df = pd.DataFrame({'DateTime': time_range})
+        # 既存のデータに含まれていない日付を検出
+        missing_dates = full_date_range.difference(df['DateTime'])
+        logger.info(f"補完が必要な時間帯の数: {len(missing_dates)}")
         
-        # 元のデータとマージ
-        merged_df = pd.merge(new_df, df, on='DateTime', how='left')
+        # 欠損日付を含むデータフレームを作成
+        missing_data = pd.DataFrame({
+            'DateTime': missing_dates,
+            'Balance': None
+        })
         
-        # 欠損値を前方補完（直前の値で埋める）
-        merged_df['Balance'] = merged_df['Balance'].fillna(method='ffill')
+        # データの結合
+        result_df = pd.concat([df, missing_data], ignore_index=True)
         
-        # 必要な列のみを選択
-        result_df = merged_df[['DateTime', 'Balance']]
+        # 時間でソートして前方補完
+        result_df = result_df.sort_values('DateTime')
+        result_df['Balance'] = result_df['Balance'].fillna(method='ffill')
+        
+        # インデックスをリセット
+        result_df = result_df.reset_index(drop=True)
+        
+        # 重複行の最終確認（最初の値を保持）
+        result_df = result_df.drop_duplicates(subset=['DateTime'], keep='first')
         
         # DateTime列を指定の形式に変換
         result_df['DateTime'] = result_df['DateTime'].dt.strftime('%Y.%m.%d %H:%M:%S')
         
         # 結果を保存
         output_path = get_output_path(file_path)
-        result_df.to_csv(output_path, index=False)
+        result_df.to_csv(output_path, index=False, encoding='utf-8-sig')
         logger.info(f"処理結果を保存しました: {output_path}")
+        logger.info(f"最終的なデータ行数: {len(result_df)}行")
         
         return result_df
 
