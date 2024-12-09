@@ -8,6 +8,7 @@ from pathlib import Path
 from src.data_processor import process_csv
 from src.time_utils import round_time_to_nearest_15min
 from datetime import datetime
+from src.merge_processor import merge_h1_g2_files, validate_file_compatibility, generate_h4_filename
 
 # ページ設定
 st.set_page_config(
@@ -39,7 +40,7 @@ def detect_encoding(file_content):
     return result['encoding']
 
 def find_data_start(df):
-    """実データの開始行��検索"""
+    """実データの開始行を検索"""
     # "約定"と"時間"が連続する行を探す
     for idx in range(len(df) - 1):
         current_row = df.iloc[idx].astype(str)
@@ -130,7 +131,7 @@ def main():
     st.title("MT5 Data Converter")
     
     # タブの作成
-    tab1, tab2 = st.tabs(["HTML変換", "時間・残高抽出"])
+    tab1, tab2, tab3 = st.tabs(["HTML変換", "時間・残高抽出", "データマージ"])
     
     with tab1:
         # ファイルアップロードエリア
@@ -164,10 +165,10 @@ def main():
                 # 出力オプション
                 st.subheader("データ出力")
                 
-                # 空行削除オプション
+                # 空行削除オプ��ョン
                 remove_empty = st.checkbox('空行を削除してダウンロード', True)
 
-                # 時間丸���オプション
+                # 時間丸めオプション
                 round_time = st.checkbox('時間を15分単位に丸める', False)
                 if round_time:
                     try:
@@ -256,6 +257,62 @@ def main():
                         except:
                             pass
     
+    with tab3:
+        st.header("H1とG2ファイルのマージ")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            h1_file = st.file_uploader(
+                "H1ファイル",
+                type=['csv'],
+                key="h1_uploader"
+            )
+            if h1_file:
+                st.success(f"✓ {h1_file.name}")
+
+        with col2:
+            g2_file = st.file_uploader(
+                "G2ファイル",
+                type=['csv'],
+                key="g2_uploader"
+            )
+            if g2_file:
+                st.success(f"✓ {g2_file.name}")
+
+        if h1_file and g2_file:
+            if st.button("ファイルをマージ", type="primary", use_container_width=True):
+                with st.spinner("マージ処理中..."):
+                    try:
+                        with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as h1_temp, \
+                             tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as g2_temp:
+                            h1_temp.write(h1_file.getvalue())
+                            g2_temp.write(g2_file.getvalue())
+                            
+                            merged_df, _ = merge_h1_g2_files(h1_temp.name, g2_temp.name)
+                            
+                            if merged_df is not None:
+                                output_filename = generate_h4_filename(h1_file.name, g2_file.name)
+                                st.success("✨ マージが完了しました")
+                                
+                                with st.expander("データプレビュー"):
+                                    st.dataframe(merged_df.head())
+                                    st.caption(f"総行数: {len(merged_df):,}行")
+                                
+                                csv = merged_df.to_csv(index=False).encode('utf-8-sig')
+                                st.download_button(
+                                    "📥 H4ファイルをダウンロード",
+                                    csv,
+                                    output_filename,
+                                    "text/csv",
+                                    use_container_width=True
+                                )
+                            
+                            os.unlink(h1_temp.name)
+                            os.unlink(g2_temp.name)
+                            
+                    except Exception as e:
+                        st.error("マージ処理に失敗しました")
+
     # フッター
     st.markdown("---")
     st.caption("MT5 Data Converter v1.0.0")
