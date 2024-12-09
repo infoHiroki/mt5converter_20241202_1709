@@ -39,7 +39,7 @@ def detect_encoding(file_content):
     return result['encoding']
 
 def find_data_start(df):
-    """実データの開始行を検索"""
+    """実データの開始行��検索"""
     # "約定"と"時間"が連続する行を探す
     for idx in range(len(df) - 1):
         current_row = df.iloc[idx].astype(str)
@@ -167,7 +167,7 @@ def main():
                 # 空行削除オプション
                 remove_empty = st.checkbox('空行を削除してダウンロード', True)
 
-                # 時間丸めオプション
+                # 時間丸���オプション
                 round_time = st.checkbox('時間を15分単位に丸める', False)
                 if round_time:
                     try:
@@ -191,8 +191,8 @@ def main():
                 if output_format.startswith("CSV"):
                     encoding = 'utf-8-sig' if "UTF-8" in output_format else 'shift-jis'
                     csv = output_df.to_csv(index=False).encode(encoding)
-                    # 元のファイル名から.htmlまたは.htmを.csvに置換
-                    output_filename = Path(uploaded_file.name).stem + '.csv'
+                    # 元のファイル名から先頭2文字を削除してH2を付加
+                    output_filename = 'H2' + Path(uploaded_file.name).stem[2:] + '.csv'
                     st.download_button(
                         "💾 CSVをダウンロード",
                         csv,
@@ -203,8 +203,8 @@ def main():
                     buffer = io.BytesIO()
                     with pd.ExcelWriter(buffer) as writer:
                         output_df.to_excel(writer, index=False)
-                    # 元のファイル名から.htmlまたは.htmを.xlsxに置換
-                    output_filename = Path(uploaded_file.name).stem + '.xlsx'
+                    # 元のファイル名から先頭2文字を削除してH2を付加
+                    output_filename = 'H2' + Path(uploaded_file.name).stem[2:] + '.xlsx'
                     st.download_button(
                         "💾 Excelをダウンロード",
                         buffer,
