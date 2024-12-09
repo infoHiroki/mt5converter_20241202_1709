@@ -258,7 +258,6 @@ def main():
                             pass
     
     with tab3:
-        st.header("H1とG2ファイルのマージ")
         
         # ドロップゾーンのスタイルを統一
         st.markdown("""
