@@ -2,6 +2,7 @@ import pandas as pd
 import logging
 from typing import Optional
 from pathlib import Path
+from datetime import datetime, timedelta
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -64,7 +65,7 @@ def get_output_path(input_path: str) -> str:
 
 def process_csv(file_path: str) -> Optional[pd.DataFrame]:
     """
-    CSVファイルから時間と残高のデータを抽出・整形し、_BDを付けて保存する
+    CSVファイルから時間と残高のデータを抽出・整形し、15分間隔のデータを生成する
     
     Args:
         file_path: 処理対象のCSVファイルパス
@@ -74,20 +75,57 @@ def process_csv(file_path: str) -> Optional[pd.DataFrame]:
     """
     try:
         logger.info(f"CSVファイル読み込み開始: {file_path}")
+        # CSVファイルを読み込み（日本語列名に対応）
         df = pd.read_csv(file_path)
         logger.info(f"CSVファイル読み込み完了: {len(df)}行")
 
-        # データの抽出と整形を順番に実行
-        df = extract_time_balance(df)
-        df = clean_balance_data(df)
-        df = format_datetime(df)
+        # 必要な列のみを抽出
+        df = df[['時間', '残高']].copy()
+        
+        # 列名を英語に変更
+        df.columns = ['DateTime', 'Balance']
+        
+        # 残高の数値変換（スペースを削除）
+        df['Balance'] = df['Balance'].astype(str).str.replace(' ', '').astype(float)
+        
+        # DateTime列を日時型に変換
+        df['DateTime'] = pd.to_datetime(df['DateTime'], format='%Y.%m.%d %H:%M:%S')
+        
+        # データを時間順にソート
+        df = df.sort_values('DateTime')
+        
+        # 最初と最後の時間を取得
+        start_time = df['DateTime'].min()
+        end_time = df['DateTime'].max()
+        
+        # 15分間隔の時間範囲を生成
+        time_range = pd.date_range(
+            start=start_time,
+            end=end_time,
+            freq='15min'
+        )
+        
+        # 新しいデータフレームを作成
+        new_df = pd.DataFrame({'DateTime': time_range})
+        
+        # 元のデータとマージ
+        merged_df = pd.merge(new_df, df, on='DateTime', how='left')
+        
+        # 欠損値を前方補完（直前の値で埋める）
+        merged_df['Balance'] = merged_df['Balance'].fillna(method='ffill')
+        
+        # 必要な列のみを選択
+        result_df = merged_df[['DateTime', 'Balance']]
+        
+        # DateTime列を指定の形式に変換
+        result_df['DateTime'] = result_df['DateTime'].dt.strftime('%Y.%m.%d %H:%M:%S')
         
         # 結果を保存
         output_path = get_output_path(file_path)
-        df.to_csv(output_path, index=False)
+        result_df.to_csv(output_path, index=False)
         logger.info(f"処理結果を保存しました: {output_path}")
         
-        return df
+        return result_df
 
     except Exception as e:
         logger.error(f"エラーが発生しました: {str(e)}", exc_info=True)
