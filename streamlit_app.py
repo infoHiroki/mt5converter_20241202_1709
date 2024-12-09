@@ -165,7 +165,7 @@ def main():
                 # 出力オプション
                 st.subheader("データ出力")
                 
-                # 空行削除オプション
+                # 空行削除オプ��ョン
                 remove_empty = st.checkbox('空行を削除してダウンロード', True)
 
                 # 時間丸めオプション
@@ -192,8 +192,8 @@ def main():
                 if output_format.startswith("CSV"):
                     encoding = 'utf-8-sig' if "UTF-8" in output_format else 'shift-jis'
                     csv = output_df.to_csv(index=False).encode(encoding)
-                    # 元のファイル名から先頭2文字を削除してH2を付加
-                    output_filename = 'H2' + Path(uploaded_file.name).stem[2:] + '.csv'
+                    # 元のファイル名から先頭2文字を削除してH1を付加
+                    output_filename = 'H1' + Path(uploaded_file.name).stem[2:] + '.csv'
                     st.download_button(
                         "💾 CSVをダウンロード",
                         csv,
@@ -204,8 +204,8 @@ def main():
                     buffer = io.BytesIO()
                     with pd.ExcelWriter(buffer) as writer:
                         output_df.to_excel(writer, index=False)
-                    # 元のファイル名から先頭2文字を削除してH2を付加
-                    output_filename = 'H2' + Path(uploaded_file.name).stem[2:] + '.xlsx'
+                    # 元のファイル名から先頭2文字を削除してH1を付加
+                    output_filename = 'H1' + Path(uploaded_file.name).stem[2:] + '.xlsx'
                     st.download_button(
                         "💾 Excelをダウンロード",
                         buffer,
@@ -239,7 +239,7 @@ def main():
                         
                         if output_df is not None:
                             # 変換結果のダウンロードボタンを表示
-                            output_filename = Path(csv_file.name).stem + '_BD.csv'
+                            output_filename = 'H2' + Path(csv_file.name).stem[2:] + '_BD.csv'
                             csv = output_df.to_csv(index=False).encode('utf-8-sig')
                             st.download_button(
                                 label="💾 抽出済みファイルをダウンロード",
