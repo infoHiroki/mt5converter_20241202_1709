@@ -323,7 +323,7 @@ def main():
 
     # フッター
     st.markdown("---")
-    st.caption("MT5 Data Converter v1.0.0")
+    st.caption("MT5 Data Converter v3.0.0")
 
 if __name__ == "__main__":
     main()
