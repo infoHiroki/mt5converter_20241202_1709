@@ -165,7 +165,7 @@ def main():
                 # 出力オプション
                 st.subheader("データ出力")
                 
-                # 空行削除オプ��ョン
+                # 空行削除オプション
                 remove_empty = st.checkbox('空行を削除してダウンロード', True)
 
                 # 時間丸めオプション
@@ -260,12 +260,21 @@ def main():
     with tab3:
         st.header("H1とG2ファイルのマージ")
         
+        # ドロップゾーンのスタイルを統一
+        st.markdown("""
+            <div class="drop-zone">
+                <h3>📊 H1とG2ファイルをマージ</h3>
+                <p>CSVファイルをドラッグ&ドロップまたはクリックして選択</p>
+                <small>対応形式: CSV</small>
+            </div>
+        """, unsafe_allow_html=True)
+        
         col1, col2 = st.columns(2)
         with col1:
             h1_file = st.file_uploader(
                 "H1ファイル",
                 type=['csv'],
-                key="h1_uploader"
+                key="merge_h1_uploader"
             )
             if h1_file:
                 st.success(f"✓ {h1_file.name}")
@@ -274,7 +283,7 @@ def main():
             g2_file = st.file_uploader(
                 "G2ファイル",
                 type=['csv'],
-                key="g2_uploader"
+                key="merge_g2_uploader"
             )
             if g2_file:
                 st.success(f"✓ {g2_file.name}")
